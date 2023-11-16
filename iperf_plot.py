@@ -1,35 +1,45 @@
 import json
 import matplotlib.pyplot as plt
+import os
 
-# Path to the iPerf output file in JSON format
-iperf_json_file_path = './iperf_udp_output.json'
+def load_and_parse_iperf_data(filepath):
+    """Load and parse iPerf JSON data from a given filepath."""
+    with open(filepath, 'r') as iperf_file:
+        iperf_data = json.load(iperf_file)
+    time_intervals_seconds = [interval['sum']['end'] for interval in iperf_data['intervals']]
+    throughput_mbps = [interval['sum']['bits_per_second'] / 1e6 for interval in iperf_data['intervals']]
+    return iperf_data, time_intervals_seconds, throughput_mbps
 
-# Read and parse the JSON data from the file
-with open(iperf_json_file_path, 'r') as iperf_file:
-    iperf_data = json.load(iperf_file)
+def generate_plot_title(iperf_data):
+    """Generate a descriptive title from the iPerf JSON data."""
+    protocol = iperf_data['start']['test_start']['protocol']
+    host = iperf_data['start']['connecting_to']['host']
+    timestamp = iperf_data['start']['timestamp']['time']
+    return f"{protocol} Throughput to {host} - {timestamp}"
 
-# Initialize lists to store the time intervals and throughput values
-time_intervals_seconds = []
-throughput_bits_per_second = []
+def plot_throughput(time_intervals, throughput_mbps, title):
+    """Plot throughput over time with a given title."""
+    plt.plot(time_intervals, throughput_mbps, marker='o', linestyle='-')
+    plt.title(title)
+    plt.xlabel('Time (Seconds)')
+    plt.ylabel('Throughput (Megabits per Second)')
 
-# Loop through each interval in the data to extract relevant information
-for interval in iperf_data['intervals']:
-    # The 'end' key holds the ending time of the interval
-    interval_end_time = interval['sum']['end']
-    time_intervals_seconds.append(interval_end_time)
+# Directory containing the iPerf output files
+output_folder_path = './output'
 
-    # The 'bits_per_second' key holds the throughput in bits/sec
-    interval_throughput = interval['sum']['bits_per_second']
-    throughput_bits_per_second.append(interval_throughput)
+# Find all JSON files in the directory
+iperf_files = [f for f in os.listdir(output_folder_path) if f.endswith('.json')]
 
-# Convert throughput from bits per second to megabits per second for better readability
-throughput_megabits_per_second = [throughput / 1e6 for throughput in throughput_bits_per_second]
+# Initialize the plot
+plt.figure(figsize=(12, 6))
 
-# Plotting the UDP throughput over time using matplotlib
-plt.figure(figsize=(10, 6))
-plt.plot(time_intervals_seconds, throughput_megabits_per_second, marker='o', linestyle='-', color='blue')
-plt.title('UDP Throughput Over Time from iPerf Data')
-plt.xlabel('Time (Seconds)')
-plt.ylabel('Throughput (Megabits per Second)')
+# Process each file and add it to the plot
+for file in iperf_files:
+    file_path = os.path.join(output_folder_path, file)
+    iperf_data, time_intervals, throughput = load_and_parse_iperf_data(file_path)
+    title = generate_plot_title(iperf_data)
+    plot_throughput(time_intervals, throughput, title)
+
+plt.legend([os.path.splitext(file)[0] for file in iperf_files])
 plt.grid(True)
 plt.show()
